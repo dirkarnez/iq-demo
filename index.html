@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>瀏覽器基頻 I/Q 解析器</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
+        #canvas { background: #000; border: 1px solid #333; margin-top: 10px; }
+        .controls { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <h2>JavaScript 原始 I/Q 基頻數據解析器</h2>
+    <div class="controls">
+        <label>選擇下載的 32-bit Float I/Q 檔案 (.raw / .bin)：</label><br><br>
+        <input type="file" id="fileInput">
+    </div>
+    <div id="status">等待載入檔案...</div>
+    <canvas id="canvas" width="800" height="300"></canvas>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('status').innerText = `正在讀取: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)...`;
+
+            const reader = new FileReader();
+            
+            // 以 ArrayBuffer (原始二進制記憶體) 格式讀取檔案
+            reader.readAsArrayBuffer(file);
+
+            reader.onload = function(event) {
+                const buffer = event.target.result;
+                
+                // 假設檔案是標準的 32-bit 浮點數 (Float32, 每個數字 4 Bytes)
+                // 陣列排列方式通常為: [I0, Q0, I1, Q1, I2, Q2...]
+                const floatView = new Float32Array(buffer);
+                const totalSamples = floatView.length / 2; // I 和 Q 各算一個樣本
+
+                document.getElementById('status').innerText = `成功載入！總共包含 ${totalSamples.toLocaleString()} 個 I/Q 採樣點。`;
+
+                // 擷取前 800 個點進行畫布繪製 (對應 Canvas 寬度)
+                const displaySamples = Math.min(800, totalSamples);
+                
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // 繪製基準線
+                ctx.strokeStyle = '#333';
+                ctx.beginPath(); ctx.moveTo(0, 150); ctx.lineTo(800, 150); ctx.stroke();
+
+                // 開始繪製 I 與 Q 的波形
+                ctx.lineWidth = 1.5;
+                
+                // 1. 繪製 同相分量 I (綠線)
+                ctx.strokeStyle = '#00ff00';
+                ctx.beginPath();
+                for (let i = 0; i < displaySamples; i++) {
+                    const i_val = floatView[i * 2]; // 偶數索引為 I
+                    const y = 150 - (i_val * 100);  // 放大 100 倍以利觀測
+                    if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+                }
+                ctx.stroke();
+
+                // 2. 繪製 正交分量 Q (紅線)
+                ctx.strokeStyle = '#ff0055';
+                ctx.beginPath();
+                for (let i = 0; i < displaySamples; i++) {
+                    const q_val = floatView[i * 2 + 1]; // 奇數索引為 Q
+                    const y = 150 - (q_val * 100);
+                    if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+                }
+                ctx.stroke();
+            };
+        });
+    </script>
+</body>
+</html>
